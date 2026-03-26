@@ -5,8 +5,15 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-import streamlit as st
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+# import streamlit as st
+# client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+try:
+    import streamlit as st
+    api_key = st.secrets["GROQ_API_KEY"]
+except Exception:
+    api_key = os.environ.get("GROQ_API_KEY", "")
+
+client = Groq(api_key=api_key)
 
 CATEGORY_HINTS = {
     "Interior Design":    "Use livable, balanced tones like warm neutrals, earthy accents and calming shades.",
