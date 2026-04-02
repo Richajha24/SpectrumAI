@@ -27,10 +27,6 @@ CATEGORY_HINTS = {
 
 
 def classify_mood(mood: str) -> str:
-    """
-    Pre-classification step: identifies the visual identity of the input
-    before generating the palette, using low temperature for factual recall.
-    """
     response = client.chat.completions.create(
         model="llama-3.1-8b-instant",
         messages=[{
@@ -46,25 +42,18 @@ Now do this for: "{mood}" """
 
 
 def generate_palette(mood, category, num_colors=5, details="", locked_colors=None):
-    """
-    locked_colors: list of length num_colors where each item is either
-                   a color dict (locked, keep as-is) or None (regenerate this slot).
-                   Pass None to generate all colors fresh.
-    """
     hint = CATEGORY_HINTS.get(category, CATEGORY_HINTS["Other"])
     details_block = f"Additional context: {details.strip()}\n" if details.strip() else ""
 
-    # ── pre-classify the mood for better color anchoring ──────────────────────
     visual_identity = classify_mood(mood)
 
-    # ── figure out what needs generating ──────────────────────────────────────
     locked_block = ""
     positions_to_fill = list(range(num_colors))
 
     if locked_colors:
-        locked_items      = [(i, c) for i, c in enumerate(locked_colors) if c is not None]
+        locked_items = [(i, c) for i, c in enumerate(locked_colors) if c is not None]
         positions_to_fill = [i for i, c in enumerate(locked_colors) if c is None]
-        num_to_generate   = len(positions_to_fill)
+        num_to_generate = len(positions_to_fill)
 
         if num_to_generate == 0:
             return list(locked_colors)
@@ -121,14 +110,25 @@ Output only the JSON array, no explanation:
     )
 
     raw = response.choices[0].message.content.strip()
+
     if "```" in raw:
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
+        parts = raw.split("```")
+        for part in parts:
+            part = part.strip()
+            if part.startswith("json"):
+                part = part[4:].strip()
+            if part.startswith("["):
+                raw = part
+                break
+
+    if not raw.startswith("["):
+        start = raw.find("[")
+        end = raw.rfind("]")
+        if start != -1 and end != -1:
+            raw = raw[start:end+1]
 
     new_colors = json.loads(raw.strip())
 
-    # ── merge locked + new colors back into original positions ─────────────────
     if locked_colors:
         result = list(locked_colors)
         j = 0
